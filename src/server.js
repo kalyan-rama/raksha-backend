@@ -11,49 +11,49 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
-/* ===============================
-   ALLOWED ORIGINS
-================================ */
-const allowedOrigins = [
-  "http://localhost:5173",
-  "https://raksha-one.netlify.app/"
-];
+/* ===================================
+   CORS CONFIGURATION (IMPORTANT)
+=================================== */
 
-/* ===============================
-   CORS FIX
-================================ */
+const allowedOrigin = "https://raksha-one.netlify.app";
+
 app.use(
   cors({
-    origin: allowedOrigins,
-    methods: ["GET", "POST", "PUT"],
+    origin: allowedOrigin,
+    methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
 );
 
+// Handle preflight requests
+app.options("*", cors());
+
 app.use(express.json());
 
-/* ===============================
+/* ===================================
    SOCKET.IO WITH CORS
-================================ */
+=================================== */
+
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
-    methods: ["GET", "POST", "PUT"],
+    origin: allowedOrigin,
+    methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   },
 });
 
-/* ===============================
-   MongoDB
-================================ */
+/* ===================================
+   MongoDB Connection
+=================================== */
+
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB Connected"))
-  .catch((err) => console.log(err));
+  .catch((err) => console.log("MongoDB Error:", err));
 
-/* ===============================
-   ROUTES
-================================ */
+/* ===================================
+   Routes
+=================================== */
 
 app.get("/", (req, res) => {
   res.send("Raksha Backend Running 🚑");
@@ -63,35 +63,49 @@ app.get("/", (req, res) => {
 app.post("/emergency", async (req, res) => {
   try {
     const emergency = await Emergency.create(req.body);
+
+    // Emit real-time update
     io.emit("newEmergency", emergency);
+
     res.status(201).json(emergency);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-/* Get All */
+/* Get All Emergencies */
 app.get("/emergency", async (req, res) => {
-  const emergencies = await Emergency.find().sort({ createdAt: -1 });
-  res.json(emergencies);
+  try {
+    const emergencies = await Emergency.find().sort({
+      createdAt: -1,
+    });
+    res.json(emergencies);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-/* Update */
+/* Update Emergency */
 app.put("/emergency/:id", async (req, res) => {
-  const updated = await Emergency.findByIdAndUpdate(
-    req.params.id,
-    req.body,
-    { new: true }
-  );
+  try {
+    const updated = await Emergency.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
 
-  io.emit("updateEmergency", updated);
+    io.emit("updateEmergency", updated);
 
-  res.json(updated);
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-/* ===============================
-   SOCKET CONNECTION
-================================ */
+/* ===================================
+   Socket Connection
+=================================== */
+
 io.on("connection", (socket) => {
   console.log("Client connected:", socket.id);
 
@@ -100,9 +114,10 @@ io.on("connection", (socket) => {
   });
 });
 
-/* ===============================
-   START SERVER
-================================ */
+/* ===================================
+   Start Server
+=================================== */
+
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
