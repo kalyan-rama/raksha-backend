@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const emergencySchema = new mongoose.Schema(
   {
@@ -6,20 +6,22 @@ const emergencySchema = new mongoose.Schema(
       lat: Number,
       lng: Number,
     },
-    district: String,
+    district: {
+      type: String,
+      default: "Unknown",
+    },
     status: {
       type: String,
       default: "CREATED",
     },
-    ambulance: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Ambulance",
+    createdAt: {
+      type: Date,
+      default: Date.now,
     },
     dispatchedAt: Date,
     arrivedAt: Date,
-    completedAt: Date,
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model("Emergency", emergencySchema);
+export default mongoose.model("Emergency", emergencySchema);
