@@ -10,17 +10,41 @@ dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: "*",
-  },
-});
 
-app.use(cors());
+/* ===============================
+   ALLOWED ORIGINS
+================================ */
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://raksha-one.netlify.app/"
+];
+
+/* ===============================
+   CORS FIX
+================================ */
+app.use(
+  cors({
+    origin: allowedOrigins,
+    methods: ["GET", "POST", "PUT"],
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 
 /* ===============================
-   MongoDB Connection
+   SOCKET.IO WITH CORS
+================================ */
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST", "PUT"],
+    credentials: true,
+  },
+});
+
+/* ===============================
+   MongoDB
 ================================ */
 mongoose
   .connect(process.env.MONGO_URI)
@@ -28,7 +52,7 @@ mongoose
   .catch((err) => console.log(err));
 
 /* ===============================
-   Routes
+   ROUTES
 ================================ */
 
 app.get("/", (req, res) => {
@@ -39,22 +63,20 @@ app.get("/", (req, res) => {
 app.post("/emergency", async (req, res) => {
   try {
     const emergency = await Emergency.create(req.body);
-
     io.emit("newEmergency", emergency);
-
     res.status(201).json(emergency);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-/* Get All Emergencies */
+/* Get All */
 app.get("/emergency", async (req, res) => {
   const emergencies = await Emergency.find().sort({ createdAt: -1 });
   res.json(emergencies);
 });
 
-/* Update Emergency */
+/* Update */
 app.put("/emergency/:id", async (req, res) => {
   const updated = await Emergency.findByIdAndUpdate(
     req.params.id,
@@ -68,7 +90,7 @@ app.put("/emergency/:id", async (req, res) => {
 });
 
 /* ===============================
-   Socket Connection
+   SOCKET CONNECTION
 ================================ */
 io.on("connection", (socket) => {
   console.log("Client connected:", socket.id);
@@ -79,7 +101,7 @@ io.on("connection", (socket) => {
 });
 
 /* ===============================
-   Start Server
+   START SERVER
 ================================ */
 const PORT = process.env.PORT || 5000;
 
